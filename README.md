@@ -3,6 +3,7 @@
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.9.0-brightgreen.svg)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14.16.3-blue.svg)](https://discord.js.org/)
+[![DOI](https://zenodo.org/badge/1008383777.svg)](https://doi.org/10.5281/zenodo.15741822)
 
 A powerful Discord bot for creating and managing challenges with digital badge rewards and progress tracking. Features role-based challenge creation, comprehensive user statistics, and automated reward distribution.
 
