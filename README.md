@@ -16,6 +16,46 @@ A powerful Discord bot for creating and managing challenges with digital badge r
 - **Role-Based Access**: Maker role system for content creators
 - **Admin Tools**: Comprehensive administrative commands for bot management
 
+## 📸 Preview
+
+Sample screenshot showing a subset of commands
+
+<details>
+<summary>Commands</summary>
+
+![Commands](/assets/commands.png)
+</details>
+<details>
+<summary>Game List</summary>
+
+![Game list](/assets/game-list-pager.png)
+</details>
+<details>
+<summary>Game Detail</summary>
+
+![Game detail](/assets/game-detail.png)
+</details>
+<details>
+<summary>Leaderboard</summary>
+
+![Leaderboard](/assets/leaderboard.png)
+</details>
+<details>
+<summary>Notification</summary>
+
+![Notification](/assets/notification.png)
+</details>
+<details>
+<summary>Maker</summary>
+
+![Maker](/assets/maker.png)
+</details>
+<details>
+<summary>Review</summary>
+
+![Review](/assets/review-notification.png)
+</details>
+
 ## 🚀 Available Commands
 
 ### User Commands
