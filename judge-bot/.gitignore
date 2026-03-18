@@ -11,6 +11,7 @@
 # Discord Bot Tokens and API Keys
 config/secrets.yaml
 config/tokens.yaml
+config/api.yaml
 *.token
 *.key
 
@@ -23,7 +24,6 @@ lerna-debug.log*
 .pnpm-debug.log*
 
 # Package Manager Files
-package-lock.json
 yarn.lock
 .pnpm-lock.yaml
 

@@ -427,10 +427,10 @@ module.exports = {
       }
       
       embed.addFields(
-        { 
-          name: 'Registered Email', 
-          value: userStats.user.email || 'No email registered', 
-          inline: true 
+        {
+          name: 'Registered Email',
+          value: Validation.maskEmail(userStats.user.email),
+          inline: true
         },
         { 
           name: 'Registration Date', 
@@ -515,7 +515,7 @@ module.exports = {
   } catch (error) {
     logger.error(`Error in user-stats command: ${error.message}`);
     await interaction.reply({
-      content: `❌ An error occurred while retrieving user stats: ${error.message}`,
+      content: '❌ An error occurred while retrieving user stats. Please try again later.',
       ephemeral: true
     });
   }

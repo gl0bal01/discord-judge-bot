@@ -14,8 +14,8 @@ const { recordReward } = require('./database');
 class RewardService {
   constructor(config) {
     this.config = config;
-    this.badgrBaseUrl = config.badgr.base_url;
-    this.badgrToken = config.badgr.token;
+    this.badgrBaseUrl = process.env.BADGR_BASE_URL || config.badgr.base_url;
+    this.badgrToken = process.env.BADGR_TOKEN || '';
   }
 
   /**
@@ -69,29 +69,46 @@ class RewardService {
         throw new Error('Badge class ID is not configured for this game');
       }
 
-      // Make API call to Badgr
-      const response = await axios.post(
-        `${this.badgrBaseUrl}/badgeclasses/${badgeClassId}/assertions`,
-        {
-          recipient: {
-            identity: user.email,
-            type: 'email',
-            hashed: true
-          },
-          evidence: [
-            {
-              type: 'Evidence',
-              narrative: `Completed the "${game.name}" challenge in Discord ScoreBot`
-            }
-          ]
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.badgrToken}`,
-            'Content-Type': 'application/json'
-          }
+      if (!this.badgrToken) {
+        throw new Error('Badgr API token is not configured. Set BADGR_TOKEN environment variable.');
+      }
+
+      const requestConfig = {
+        headers: {
+          'Authorization': `Bearer ${this.badgrToken}`,
+          'Content-Type': 'application/json'
         }
-      );
+      };
+
+      const requestBody = {
+        recipient: {
+          identity: user.email,
+          type: 'email',
+          hashed: true
+        },
+        evidence: [
+          {
+            type: 'Evidence',
+            narrative: `Completed the "${game.name}" challenge in Discord ScoreBot`
+          }
+        ]
+      };
+
+      let response;
+      try {
+        response = await axios.post(
+          `${this.badgrBaseUrl}/badgeclasses/${badgeClassId}/assertions`,
+          requestBody,
+          requestConfig
+        );
+      } catch (apiError) {
+        // Detect expired/invalid token and provide actionable guidance
+        if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
+          global.logger.error(`Badgr API authentication failed (HTTP ${apiError.response.status}). The BADGR_TOKEN may be expired or invalid. Please refresh the token.`);
+          throw new Error('Badge service authentication failed. An administrator needs to refresh the API token.');
+        }
+        throw apiError;
+      }
 
       // Record the reward in the database using explicit gameId
       await recordReward(user.id, gameId, 'badgr', JSON.stringify(response.data));
@@ -99,16 +116,16 @@ class RewardService {
       return {
         type: 'badgr',
         data: response.data,
-        message: `Badge "${game.name}" issued to ${user.email}`
+        message: `Badge "${game.name}" issued successfully`
       };
     } catch (error) {
       global.logger.error(`Error issuing badge: ${error.message}`);
-      
-      // Check for specific Badgr errors
+
+      // Log Badgr API error details server-side only
       if (error.response && error.response.data) {
-        global.logger.error(`Badgr API error: ${JSON.stringify(error.response.data)}`);
+        global.logger.error(`Badgr API error details: ${JSON.stringify(error.response.data)}`);
       }
-      
+
       throw error;
     }
   }

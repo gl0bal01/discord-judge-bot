@@ -137,7 +137,7 @@ class Validation {
    */
   static sanitizeFilename(filename) {
     if (!filename || typeof filename !== 'string') return '';
-    
+
     // Remove path traversal characters and limit to safe characters
     return filename
       .replace(/\.\./g, '')
@@ -145,7 +145,37 @@ class Validation {
       .replace(/[^a-zA-Z0-9_.-]/g, '')
       .substring(0, 255); // Limit length
   }
-  
+
+  /**
+   * Resolve a game file path safely, preventing path traversal.
+   * Returns the resolved path or null if the gameId is invalid.
+   * @param {string} gameId - Game ID (user-supplied)
+   * @param {string} gamesDir - Absolute path to the games directory
+   * @returns {string|null} Safe resolved path or null
+   */
+  static resolveGamePath(gameId, gamesDir) {
+    if (!gameId || typeof gameId !== 'string') return null;
+    const sanitized = Validation.sanitizeFilename(gameId);
+    if (!sanitized) return null;
+    const resolved = require('path').resolve(gamesDir, `${sanitized}.yaml`);
+    if (!resolved.startsWith(require('path').resolve(gamesDir))) return null;
+    return resolved;
+  }
+
+  /**
+   * Mask an email address for safe display (e.g., "j***@example.com")
+   * @param {string} email - Email to mask
+   * @returns {string} Masked email
+   */
+  static maskEmail(email) {
+    if (!email || typeof email !== 'string') return 'No email registered';
+    const parts = email.split('@');
+    if (parts.length !== 2) return '***';
+    const local = parts[0];
+    const masked = local.charAt(0) + '***';
+    return `${masked}@${parts[1]}`;
+  }
+
   /**
    * Validate YAML content structure for games
    * @param {Object} content - Parsed YAML content

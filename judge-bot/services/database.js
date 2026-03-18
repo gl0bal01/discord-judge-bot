@@ -715,6 +715,54 @@ async function resetUserProgress(userId, gameId = null) {
   }
 }
 
+/**
+ * Atomically check that a game is not yet completed and mark it complete.
+ * Returns { success: false, alreadyCompleted: true } if the game was already done.
+ * This prevents race conditions from double-submissions.
+ * @param {number} userId - User ID in database
+ * @param {string} gameId - Game ID
+ * @param {number} pointsEarned - Points earned for completion
+ * @returns {Promise<Object>} Operation result
+ */
+async function completeGameAtomic(userId, gameId, pointsEarned) {
+  try {
+    if (!userId || !gameId || typeof gameId !== 'string') {
+      return { success: false, error: 'Invalid user or game ID' };
+    }
+    if (!Number.isInteger(pointsEarned) || pointsEarned < 0) {
+      return { success: false, error: 'Invalid points value' };
+    }
+
+    await db.run('BEGIN IMMEDIATE');
+    try {
+      const progress = await db.get(
+        'SELECT completed FROM progress WHERE user_id = ? AND game_id = ?',
+        [userId, gameId]
+      );
+
+      if (progress && progress.completed) {
+        await db.run('ROLLBACK');
+        return { success: false, alreadyCompleted: true };
+      }
+
+      await db.run(
+        `UPDATE progress
+         SET completed = 1, points_earned = ?, completion_date = CURRENT_TIMESTAMP
+         WHERE user_id = ? AND game_id = ?`,
+        [pointsEarned, userId, gameId]
+      );
+      await db.run('COMMIT');
+      return { success: true };
+    } catch (err) {
+      await db.run('ROLLBACK');
+      throw err;
+    }
+  } catch (error) {
+    global.logger.error(`Error in completeGameAtomic: ${error.message}`);
+    return { success: false, error: 'Database error while completing game' };
+  }
+}
+
 module.exports = {
   initializeDatabase,
   registerUser,
@@ -724,6 +772,7 @@ module.exports = {
   adminManageHints,
   recordAttempt,
   completeGame,
+  completeGameAtomic,
   recordReward,
   recordSuccessAnnouncement,
   hasCompletedAnyGames,

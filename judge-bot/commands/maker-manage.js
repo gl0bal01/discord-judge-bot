@@ -184,7 +184,7 @@ async function handleListGames(interaction, logger) {
     } catch (error) {
       logger.error(`Error reading games directory: ${error.message}`);
       await interaction.reply({
-        content: `❌ Error accessing games directory: ${error.message}`,
+        content: '❌ Error accessing games directory. Please try again later.',
         ephemeral: true
       });
       return;
@@ -214,7 +214,7 @@ async function handleListGames(interaction, logger) {
         // Try to parse YAML safely
         let gameData = null;
         try {
-          gameData = yaml.load(content);
+          gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
         } catch (yamlError) {
           logger.error(`Error parsing YAML in ${file}: ${yamlError.message}`);
           continue;
@@ -433,7 +433,7 @@ async function handleListGames(interaction, logger) {
     logger.error(`Error listing games: ${error.message}`);
     logger.error(`Error stack: ${error.stack}`);
     await interaction.reply({
-      content: `❌ An error occurred while retrieving the games list: ${error.message}`,
+      content: '❌ An error occurred while retrieving the games list. Please try again later.',
       ephemeral: true
     });
   }
@@ -563,20 +563,28 @@ if (i.customId === `approve-game-${gameId}`) {
   }
   
   // Save updated game
-  const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
-  
+  const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+  if (!gameFilePath) {
+    await i.update({
+      content: '❌ Invalid game ID.',
+      embeds: [],
+      components: []
+    });
+    return;
+  }
+
   // Remove the 'id' property before saving
   const { id, ...gameToSave } = updatedGame;
-  
+
   await fs.writeFile(
     gameFilePath,
     yaml.dump({ [gameId]: gameToSave }),
     'utf8'
   );
-  
+
   // Reload the games configuration
   await reloadGamesConfig(logger);
-  
+
   // Announce the game approval if announcer exists
   if (interaction.client.gameApprovalAnnouncer) {
     try {
@@ -744,20 +752,28 @@ if (i.customId === `reject-game-${gameId}`) {
   }
   
   // Save updated game
-  const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
-  
+  const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+  if (!gameFilePath) {
+    await i.update({
+      content: '❌ Invalid game ID.',
+      embeds: [],
+      components: []
+    });
+    return;
+  }
+
   // Remove the 'id' property before saving
   const { id, ...gameToSave } = updatedGame;
-  
+
   await fs.writeFile(
     gameFilePath,
     yaml.dump({ [gameId]: gameToSave }),
     'utf8'
   );
-  
+
   // Reload the games configuration
   await reloadGamesConfig(logger);
-  
+
   // Try to notify the game creator
   try {
     const creator = await client.users.fetch(gameData.owner_id);
@@ -893,20 +909,27 @@ collector.on('collect', async i => {
     delete updatedGame.disable_date;
     
     // Save updated game
-    const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
-    
+    const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+    if (!gameFilePath) {
+      await i.update({
+        content: '❌ Invalid game ID.',
+        components: []
+      });
+      return;
+    }
+
     // Remove the 'id' property before saving
     const { id, ...gameToSave } = updatedGame;
-    
+
     await fs.writeFile(
       gameFilePath,
       yaml.dump({ [gameId]: gameToSave }),
       'utf8'
     );
-    
+
     // Reload the games configuration
     await reloadGamesConfig(logger);
-    
+
     await i.update({
       content: `✅ The game "${gameData.name}" has been re-enabled.`,
       components: []
@@ -978,7 +1001,11 @@ disabled_by: interaction.user.tag
 };
 
 // Save updated game
-const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+if (!gameFilePath) {
+await submission.reply({ content: '❌ Invalid game ID.', ephemeral: true });
+return;
+}
 
 // Remove the 'id' property before saving
 const { id, ...gameToSave } = updatedGame;
@@ -1051,8 +1078,8 @@ async function getAllGames() {
       try {
         const gameId = path.basename(file, '.yaml');
         const content = await fs.readFile(path.join(GAMES_DIR, file), 'utf8');
-        const gameData = yaml.load(content);
-        
+        const gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
+
         if (gameData && gameData[gameId]) {
           // Sanitize numeric values to avoid "Invalid number value" errors
           const sanitizedData = sanitizeGameData(gameData[gameId]);
@@ -1108,14 +1135,15 @@ function sanitizeGameData(gameData) {
  */
 async function getGameById(gameId) {
   try {
-    const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+    const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+    if (!gameFilePath) return null;
     const content = await fs.readFile(gameFilePath, 'utf8');
-    const gameData = yaml.load(content);
+    const gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
 
     if (gameData && gameData[gameId]) {
       // Sanitize numeric values to avoid "Invalid number value" errors
       const sanitizedData = sanitizeGameData(gameData[gameId]);
-      
+
       return {
         id: gameId,
         ...sanitizedData
@@ -1152,7 +1180,7 @@ async function reloadGamesConfig(logger) {
     try {
       const existingConfigPath = path.join(__dirname, '../config/games.yaml');
       const existingContent = await fs.readFile(existingConfigPath, 'utf8');
-      const existingConfig = yaml.load(existingContent);
+      const existingConfig = yaml.load(existingContent, { schema: yaml.DEFAULT_SCHEMA });
       
       if (existingConfig && existingConfig.games) {
         // Copy existing games that aren't from the maker system
@@ -1178,7 +1206,6 @@ async function reloadGamesConfig(logger) {
         name: gameData.name,
         description: gameData.description,
         author: gameData.author,
-        answer: gameData.answer,
         difficulty: gameData.difficulty || 1,
         reward_type: gameData.reward_type || 'badgr',
         hints: gameData.hints || []

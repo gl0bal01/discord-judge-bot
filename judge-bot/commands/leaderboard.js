@@ -57,7 +57,7 @@ module.exports = {
       
       // Show detailed leaderboard if requested
       if (showDetailed) {
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply({ ephemeral: true });
         
         // Get detailed leaderboard data - get more entries for pagination
         const limit = entriesPerPage * 10; // Get enough for 10 pages

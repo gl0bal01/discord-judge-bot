@@ -44,9 +44,12 @@ class Logger {
             customFormat
           )
         }),
-        // File output
-        new transports.File({ 
-          filename: logFilePath 
+        // File output with rotation
+        new transports.File({
+          filename: logFilePath,
+          maxsize: 5242880, // 5MB per file
+          maxFiles: 5,      // Keep 5 rotated files
+          tailable: true
         })
       ]
     });

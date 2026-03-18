@@ -10,7 +10,7 @@
  * @since 2025-04-03
  */
 const { SlashCommandBuilder, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
-const { getUser, getProgress, recordAttempt, completeGame, getUserStats } = require('../services/database');
+const { getUser, getProgress, recordAttempt, completeGameAtomic, getUserStats } = require('../services/database');
 const PointsCalculator = require('../services/points');
 const RewardService = require('../services/reward');
 const Validation = require('../utils/validation');
@@ -120,7 +120,17 @@ module.exports = {
         const formattedPoints = pointsCalculator.formatPointsDisplay(pointsEarned, game);
         
         // Update database to mark game as completed
-        await completeGame(user.id, gameId, pointsEarned);
+        const completionResult = await completeGameAtomic(user.id, gameId, pointsEarned);
+        if (!completionResult.success) {
+          if (completionResult.alreadyCompleted) {
+            await submission.reply({
+              content: `✅ You have already completed the "${game.name}" challenge!`,
+              ephemeral: true
+            });
+            return;
+          }
+          throw new Error(completionResult.error || 'Failed to complete game');
+        }
         
         // Issue reward
         const rewardService = new RewardService(config);
@@ -159,7 +169,7 @@ module.exports = {
           if (rewardInfo.type === 'badgr') {
             successEmbed.addFields({
               name: 'Reward',
-              value: `🏆 Digital Badge awarded! Check your email (${user.email}) for badge delivery details.`
+              value: '🏆 Digital Badge awarded! Check the email you registered with for badge delivery details.'
             });
           } else if (rewardInfo.type === 'text') {
             // Display the text reward directly

@@ -16,9 +16,18 @@ bot:
     hint_base_penalty: 10     # Base points deducted for first hint
     hint_penalty_increase: 5  # Additional penalty for each subsequent hint
   
+  # Maker role ID (use Discord role ID, not role name)
+  maker_role_id: "0000000000000000000"  # Replace with your Maker role ID
+
   # Admin users who can access all commands
   admins:
     - "1111111111111111"  # Discord user ID for admin
+
+  # Rate limits for maker commands (in seconds)
+  maker_rate_limits:
+    maker: 5
+    maker-manage: 5
+    maker-advanced: 5
 
   # Success announcement settings
   success_announcements:

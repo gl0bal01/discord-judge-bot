@@ -87,7 +87,8 @@ async execute(interaction, { client, config, logger }) {
   try {
     // Check if user has the Maker role OR is an admin
     const member = interaction.member;
-    const hasMakerRole = member.roles.cache.some(role => role.name.toLowerCase() === 'maker');
+    const makerRoleId = config.bot.maker_role_id;
+    const hasMakerRole = makerRoleId ? member.roles.cache.has(makerRoleId) : member.roles.cache.some(role => role.name.toLowerCase() === 'maker');
     const isAdmin = Validation.isAdmin(userId, config.bot.admins);
 
     if (!hasMakerRole && !isAdmin) {
@@ -256,7 +257,14 @@ async function handleAdvancedSettings(interaction, config, logger) {
     }
 
     // Write updated game to file
-    const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+    const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+    if (!gameFilePath) {
+      await submission.reply({
+        content: '❌ Invalid game ID.',
+        ephemeral: true
+      });
+      return;
+    }
 
     try {
       // Remove the 'id' property before saving (it's redundant with the YAML key)
@@ -342,7 +350,7 @@ async function getAllGames() {
       try {
         const gameId = path.basename(file, '.yaml');
         const content = await fs.readFile(path.join(GAMES_DIR, file), 'utf8');
-        const gameData = yaml.load(content);
+        const gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
         
         if (gameData && gameData[gameId]) {
           games.push({
@@ -379,9 +387,10 @@ async function getUserOwnedGames(userId) {
 */
 async function getGameById(gameId) {
   try {
-    const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+    const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+    if (!gameFilePath) return null;
     const content = await fs.readFile(gameFilePath, 'utf8');
-    const gameData = yaml.load(content);
+    const gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
 
     if (gameData && gameData[gameId]) {
       return {
@@ -421,7 +430,7 @@ async function reloadGamesConfig(logger) {
     try {
       const existingConfigPath = path.join(__dirname, '../config/games.yaml');
       const existingContent = await fs.readFile(existingConfigPath, 'utf8');
-      const existingConfig = yaml.load(existingContent);
+      const existingConfig = yaml.load(existingContent, { schema: yaml.DEFAULT_SCHEMA });
       
       if (existingConfig && existingConfig.games) {
         // Copy existing games that aren't from the maker system
@@ -446,7 +455,6 @@ async function reloadGamesConfig(logger) {
         name: gameData.name,
         description: gameData.description,
         author: gameData.author,
-        answer: gameData.answer,
         difficulty: gameData.difficulty || 1,
         reward_type: gameData.reward_type || 'badgr',
         hints: gameData.hints || []
@@ -619,7 +627,14 @@ async function handleRewardSettings(interaction, config, logger) {
     }
 
     // Write updated game to file
-    const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+    const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+    if (!gameFilePath) {
+      await submission.reply({
+        content: '❌ Invalid game ID.',
+        ephemeral: true
+      });
+      return;
+    }
 
     try {
       // Remove the 'id' property before saving (it's redundant with the YAML key)

@@ -10,6 +10,7 @@
  */
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getUser, getUserStats } = require('../services/database');
+const Validation = require('../utils/validation');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -94,7 +95,7 @@ module.exports = {
       if (user.email) {
         embed.addFields({
           name: 'Registered Email',
-          value: user.email
+          value: Validation.maskEmail(user.email)
         });
       }
       

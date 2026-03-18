@@ -106,7 +106,8 @@ async execute(interaction, { client, config, logger }) {
   try {
     // Check if user has the Maker role OR is an admin
     const member = interaction.member;
-    const hasMakerRole = member.roles.cache.some(role => role.name.toLowerCase() === 'maker');
+    const makerRoleId = config.bot.maker_role_id;
+    const hasMakerRole = makerRoleId ? member.roles.cache.has(makerRoleId) : member.roles.cache.some(role => role.name.toLowerCase() === 'maker');
     const isAdmin = Validation.isAdmin(userId, config.bot.admins);
 
     if (!hasMakerRole && !isAdmin) {
@@ -296,7 +297,11 @@ async function handleGameCreate(interaction, client, logger, config) {
       };
   
       // Write game to file
-      const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+      const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+      if (!gameFilePath) {
+        await submission.reply({ content: '❌ Invalid game ID.', ephemeral: true });
+        return;
+      }
   
       await fs.writeFile(
         gameFilePath,
@@ -626,7 +631,11 @@ if (majorChange) {
 }
 
 // Write updated game to file
-const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+if (!gameFilePath) {
+  await submission.reply({ content: '❌ Invalid game ID.', ephemeral: true });
+  return;
+}
 
 try {
 // Remove the 'id' property before saving
@@ -804,7 +813,15 @@ if (i.user.id !== interaction.user.id) {
 
 if (i.customId === `confirm-remove-${gameId}`) {
   // Remove the game file
-  const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+  const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+  if (!gameFilePath) {
+    await i.update({
+      content: '❌ Invalid game ID.',
+      embeds: [],
+      components: []
+    });
+    return;
+  }
   
   try {
     await fs.unlink(gameFilePath);
@@ -888,7 +905,7 @@ async function handleGameList(interaction, logger) {
     } catch (error) {
       logger.error(`Error reading games directory: ${error.message}`);
       await interaction.reply({
-        content: `❌ Error accessing games directory: ${error.message}`,
+        content: '❌ Error accessing games directory. Please try again later.',
         ephemeral: true
       });
       return;
@@ -910,14 +927,15 @@ async function handleGameList(interaction, logger) {
         const gameId = path.basename(file, '.yaml');
         
         // Read and parse the file
-        const filePath = path.join(GAMES_DIR, file);
+        const filePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+        if (!filePath) continue;
         
         const content = await fs.readFile(filePath, 'utf8');
         
         // Try to parse YAML safely
         let gameData = null;
         try {
-          gameData = yaml.load(content);
+          gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
         } catch (yamlError) {
           logger.error(`Error parsing YAML in ${file}: ${yamlError.message}`);
           continue;
@@ -1120,7 +1138,7 @@ async function handleGameList(interaction, logger) {
     logger.error(`Error listing games: ${error.message}`);
     logger.error(`Error stack: ${error.stack}`);
     await interaction.reply({
-      content: `❌ An error occurred while retrieving your games: ${error.message}`,
+      content: '❌ An error occurred while retrieving your games. Please try again later.',
       ephemeral: true
     });
   }
@@ -1401,8 +1419,10 @@ async function showTextRewardConfigModal(interaction, gameId, gameName) {
   for (const file of gameFiles) {
     try {
       const gameId = path.basename(file, '.yaml');
-      const content = await fs.readFile(path.join(GAMES_DIR, file), 'utf8');
-      const gameData = yaml.load(content);
+      const gamePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+      if (!gamePath) continue;
+      const content = await fs.readFile(gamePath, 'utf8');
+      const gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
       
       if (gameData && gameData[gameId]) {
         games.push({
@@ -1439,9 +1459,10 @@ async function showTextRewardConfigModal(interaction, gameId, gameName) {
   */
   async function getGameById(gameId) {
   try {
-  const gameFilePath = path.join(GAMES_DIR, `${gameId}.yaml`);
+  const gameFilePath = Validation.resolveGamePath(gameId, GAMES_DIR);
+  if (!gameFilePath) return null;
   const content = await fs.readFile(gameFilePath, 'utf8');
-  const gameData = yaml.load(content);
+  const gameData = yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
   
   if (gameData && gameData[gameId]) {
     return {
@@ -1481,7 +1502,7 @@ async function reloadGamesConfig(logger) {
     try {
       const existingConfigPath = path.join(__dirname, '../config/games.yaml');
       const existingContent = await fs.readFile(existingConfigPath, 'utf8');
-      const existingConfig = yaml.load(existingContent);
+      const existingConfig = yaml.load(existingContent, { schema: yaml.DEFAULT_SCHEMA });
       
       if (existingConfig && existingConfig.games) {
         // Copy existing games that aren't from the maker system
@@ -1507,7 +1528,6 @@ async function reloadGamesConfig(logger) {
         name: gameData.name,
         description: gameData.description,
         author: gameData.author,
-        answer: gameData.answer,
         difficulty: gameData.difficulty || 1,
         reward_type: gameData.reward_type || 'badgr',
         hints: gameData.hints || []
